@@ -1,0 +1,96 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include "DHT.h"
+
+#define SOIL_PIN 34
+#define DHTPIN 4
+#define DHTTYPE DHT11
+#define ONE_WIRE_BUS 15   // DS18B20 data pin
+
+#define DRY_VALUE 1023
+#define WET_VALUE 600
+
+const char* ssid = "D's Oneplus";
+const char* password = "12345678";
+const char* serverURL = "https://plant-monitor.onrender.com/api/sensor-data";
+
+// Sensor objects
+DHT dht(DHTPIN, DHTTYPE);
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();                 // Start DHT11
+  sensors.begin();             // Start DS18B20
+  analogReadResolution(10);    // Set ADC resolution
+
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to Wi-Fi");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\n Wi-Fi connected");
+}
+
+void loop() {
+  // Read DS18B20 temperature
+  sensors.requestTemperatures();
+  float temperature = sensors.getTempCByIndex(0);
+
+  // Read DHT11 humidity
+  float humidity = dht.readHumidity();
+
+  // Read soil moisture
+  int soilRaw = analogRead(SOIL_PIN);
+  int moisturePercent = map(soilRaw, DRY_VALUE, WET_VALUE, 0, 100);
+  moisturePercent = constrain(moisturePercent, 0, 100);
+
+  if (isnan(humidity) || temperature == DEVICE_DISCONNECTED_C) {
+    Serial.println("Sensor read error!");
+    return;
+  }
+
+  Serial.print("Temp: ");
+  Serial.print(temperature);
+  Serial.print(" °C |  Humidity: ");
+  Serial.print(humidity);
+  Serial.print(" % |  Moisture: ");
+  Serial.print(moisturePercent);
+  Serial.println(" %");
+
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverURL);
+    http.addHeader("Content-Type", "application/json");
+
+    String payload = "{";
+    payload += "\"moisture\":" + String(moisturePercent) + ",";
+    payload += "\"temperature\":" + String(temperature) + ",";
+    payload += "\"humidity\":" + String(humidity);
+    payload += "}";
+
+    int httpResponseCode = http.POST(payload);
+
+    if (httpResponseCode > 0) {
+      Serial.print("Sent! Server response: ");
+      Serial.println(http.getString());
+    } else {
+      Serial.print("POST failed. HTTP error code: ");
+      Serial.println(httpResponseCode);
+    }
+
+    http.end();
+  } else {
+    Serial.println("Wi-Fi disconnected");
+  }
+
+  delay(5000);
+}
+
+

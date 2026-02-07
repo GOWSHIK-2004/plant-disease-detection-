@@ -1,0 +1,47 @@
+name: plant_monitor
+description: "A Flutter-based Plant Monitoring application."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Fonts
+  google_fonts: ^6.2.0
+
+  # Charts (last stable before Dart 3.7+ jump)
+  syncfusion_flutter_charts: ^23.2.7
+  syncfusion_flutter_core: ^23.2.7
+
+  # Camera & media (Dart 3.4 SAFE)
+  camera: ^0.10.5+9
+  image_picker: ^1.0.8
+
+  # State management
+  provider: ^6.1.4
+
+  # Networking
+  http: ^1.1.0
+  connectivity_plus: ^5.0.2
+
+  # Local storage
+  shared_preferences: ^2.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+
+dependency_overrides:
+  win32: 5.0.0
+
