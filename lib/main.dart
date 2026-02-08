@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'providers/chat_provider.dart';
 import 'providers/user_provider.dart';
@@ -9,6 +10,7 @@ import 'providers/language_provider.dart';
 import 'providers/theme_provider.dart';
 
 import 'screens/dashboard_screen.dart';
+import 'screens/reports_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/scan_screen.dart';
 import 'screens/auth_screen.dart';
@@ -18,8 +20,37 @@ import 'screens/plant_selection_screen.dart';
 import 'utils/connectivity_utils.dart';
 import 'services/sensor_service.dart';
 
+/// 🔔 GLOBAL notification plugin
+final FlutterLocalNotificationsPlugin notificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+/// 🔔 Initialize local notifications (ANDROID-SAFE)
+Future<void> initLocalNotifications() async {
+  const AndroidInitializationSettings androidInit =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+
+  const InitializationSettings initSettings =
+      InitializationSettings(android: androidInit);
+
+  await notificationsPlugin.initialize(initSettings);
+
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'plant_health_channel',
+    'Plant Health Alerts',
+    description: 'Alerts when plant health goes abnormal',
+    importance: Importance.high,
+  );
+
+  final androidPlugin =
+      notificationsPlugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+
+  await androidPlugin?.createNotificationChannel(channel);
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initLocalNotifications();
 
   final userProvider = UserProvider();
   final chatProvider = ChatProvider();
@@ -77,28 +108,6 @@ class MyApp extends StatelessWidget {
                 brightness: Brightness.light,
               ),
               textTheme: GoogleFonts.poppinsTextTheme(),
-
-              appBarTheme: AppBarTheme(
-                centerTitle: true,
-                backgroundColor: const Color(0xFFF5F5F5),
-                elevation: 0,
-                toolbarHeight: 70,
-                titleTextStyle: GoogleFonts.poppins(
-                  color: const Color(0xFF2E7D32),
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-                iconTheme: const IconThemeData(color: Color(0xFF2E7D32)),
-              ),
-
-              // ✅ CORRECT
-              cardTheme: const CardTheme(
-                elevation: 2,
-                shadowColor: Color(0x332E7D32),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(16)),
-                ),
-              ),
             ),
 
             darkTheme: ThemeData(
@@ -106,17 +115,6 @@ class MyApp extends StatelessWidget {
               colorScheme: ColorScheme.fromSeed(
                 seedColor: const Color(0xFF81C784),
                 brightness: Brightness.dark,
-              ),
-              scaffoldBackgroundColor: const Color(0xFF121212),
-
-              // ✅ CORRECT
-              cardTheme: const CardTheme(
-                color: Color(0xFF1E1E1E),
-                elevation: 2,
-                shadowColor: Colors.black26,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(16)),
-                ),
               ),
             ),
 
@@ -151,8 +149,10 @@ class _MainScreenState extends State<MainScreen> {
   bool _hasInternet = true;
   Timer? _connectivityTimer;
 
+  /// ✅ REPORTS SCREEN ADDED HERE
   final List<Widget> _screens = const [
     DashboardScreen(),
+    ReportsScreen(),
     ChatScreen(),
     ScanScreen(),
     SettingsScreen(),
@@ -184,56 +184,52 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<LanguageProvider, UserProvider>(
-      builder: (context, languageProvider, userProvider, _) {
-        if (!_hasInternet) {
-          return Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.signal_wifi_off,
-                      size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  Text(languageProvider.getText('no_internet')),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: _checkConnection,
-                    child: Text(languageProvider.getText('retry')),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
+    if (!_hasInternet) {
+      return const Scaffold(
+        body: Center(
+          child: Text("No Internet Connection"),
+        ),
+      );
+    }
 
-        return Scaffold(
-          body: _screens[_selectedIndex],
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (i) =>
-                setState(() => _selectedIndex = i),
-            destinations: [
-              NavigationDestination(
-                icon: const Icon(Icons.dashboard),
-                label: languageProvider.getText('dashboard'),
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.chat),
-                label: languageProvider.getText('chat'),
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.camera),
-                label: languageProvider.getText('scan'),
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.settings),
-                label: languageProvider.getText('settings'),
-              ),
-            ],
-          ),
-        );
-      },
+    return Scaffold(
+      body: _screens[_selectedIndex],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (i) =>
+            setState(() => _selectedIndex = i),
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          NavigationDestination(
+              icon: Icon(Icons.insert_chart), label: 'Reports'),
+          NavigationDestination(icon: Icon(Icons.chat), label: 'Chat'),
+          NavigationDestination(icon: Icon(Icons.camera), label: 'Scan'),
+          NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
+        ],
+      ),
     );
   }
+}
+
+/// 🔔 Notification trigger (USED BY REPORTS)
+Future<void> showPlantHealthAlert({
+  required String plantName,
+  required List<String> issues,
+}) async {
+  if (issues.isEmpty) return;
+
+  await notificationsPlugin.show(
+    0,
+    '⚠ Plant Health Alert',
+    '$plantName: ${issues.join(', ')}',
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'plant_health_channel',
+        'Plant Health Alerts',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+    ),
+  );
 }
