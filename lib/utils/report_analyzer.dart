@@ -58,7 +58,7 @@ PlantHealthReport generateHourlyReport({
   final humidityTrendBad = trendBad(
       readings.map((r) => r.humidity).toList(), false);
   final moistureTrendBad = trendBad(
-      readings.map((r) => r.moisture).toList(), false);
+      readings.map((r) => r.moisture.toDouble()).toList(), false);
 
   int persistentSensors = 0;
   if (tempAbnormalPercent >= 0.7) persistentSensors++;

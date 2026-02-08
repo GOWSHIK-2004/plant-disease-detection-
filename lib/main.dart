@@ -184,13 +184,7 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_hasInternet) {
-      return const Scaffold(
-        body: Center(
-          child: Text("No Internet Connection"),
-        ),
-      );
-    }
+    
 
     return Scaffold(
       body: _screens[_selectedIndex],
